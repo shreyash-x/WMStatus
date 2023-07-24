@@ -1,0 +1,4 @@
+node_modules
+.netlify
+download-logs
+package-lock.json
