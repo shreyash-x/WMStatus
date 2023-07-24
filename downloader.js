@@ -1,27 +1,44 @@
+const config = require('config');
 const { MongoClient, GridFSBucket } = require("mongodb");
 const mongoose = require("mongoose");
 const fs = require("fs");
 const mime = require("mime-types");
-const mongoUrl = "mongodb://127.0.0.1:27017/whatsappLogs";
+const mongoUrl = config.get('services.mongodb.uri');
 const shell = require("shelljs");
 const { getDownloaderInfo } = require("./trackServer.js");
 const { sendMail } = require("./sendMail.js");
 
-const getLogStream = () => {
+
+const getPath = () => {
   const date = new Date();
   const dd = String(date.getDate()).padStart(2, "0");
   const mm = String(date.getMonth() + 1).padStart(2, "0"); //January is 0
   const yyyy = String(date.getFullYear());
-  const filename = `${dd}${mm}${yyyy}.log`;
-  const path = `${__dirname}/download-logs/${filename}`;
+  const foldername = `${dd}${mm}${yyyy}`;
+  const path = `${__dirname}/download-logs/${foldername}`;
 
   // check if logs directory exists
   if (!fs.existsSync(`${__dirname}/download-logs`)) {
     fs.mkdirSync(`${__dirname}/download-logs`);
   }
 
-  const logStream = fs.createWriteStream(path, { flags: "w" });
+  return path;
+}
+
+const getLogStream = (path) => {
+  if (!fs.existsSync(path)) {
+    fs.mkdirSync(path);
+  }
+  const filename = fs.readdirSync(path).length + 1;
+  const logStream = fs.createWriteStream(`${path}/${filename}.log`, { flags: "w" });
   return logStream;
+};
+
+const getUserLogs = (path) => {
+  if(fs.existsSync(`${path}/stats.json`)) {
+    return require(`${path}/stats.json`);
+  }
+  return {};
 };
 
 const formatLog = (log) => {
@@ -30,8 +47,9 @@ const formatLog = (log) => {
   return `[${time}]\t${log}`;
 };
 
-const logStream = getLogStream();
-const userLogs = {};
+const path = getPath();
+const logStream = getLogStream(path);
+const userLogs = getUserLogs(path);
 
 const writeLog = async (log) => {
   logStream.write(formatLog(log) + "\n");
@@ -128,6 +146,7 @@ async function main() {
         already_downloaded,
       });
     }
+    fs.writeFileSync(`${path}/stats.json`, JSON.stringify(userLogs));
     // console.log("Connected correctly to server");
   } catch (err) {
     console.error(err);
@@ -136,11 +155,13 @@ async function main() {
     try {
       const html = await getDownloaderInfo(userLogs);
       writeLog("Updated website https://wmstatus.netlify.app");
-      try {
-        await sendMail(html);
-        writeLog("Mail sent successfully");
-      } catch (err) {
-        writeLog("Error sending mail");
+      if (config.get('mailer.enabled')) {
+        try {
+          await sendMail(html);
+          writeLog("Mail sent successfully");
+        } catch (err) {
+          writeLog("Error sending mail");
+        }
       }
     } catch (err) {
       writeLog("Error updating website");
