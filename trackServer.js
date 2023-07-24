@@ -1,12 +1,12 @@
+const config = require('config');
 const shell = require("shelljs");
 const fs = require("fs");
 const { JSDOM } = require("jsdom");
-
-const template = fs.readFileSync(`${__dirname}/template.html`, "utf8");
+const template = fs.readFileSync(`${__dirname}/templates/stats.html`, "utf8");
 const dom = new JSDOM(template);
 const { hostPages } = require("./renderPages.js");
 
-const processNames = ["backend", "frontend"];
+const processNames = [config.get("services.backend.name"), config.get("services.frontend.name")];
 
 const getUptime = (upSince) => {
   // get current time in unix timestamp in milliseconds

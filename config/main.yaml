@@ -1,0 +1,13 @@
+mailer:
+  enabled: true
+  email: shreyashjain1007@gmail.com
+
+services:
+  frontend:
+    name: wm-frontend
+  backend:
+    name: app
+  mongodb:
+    uri: mongodb://127.0.0.1:27017/whatsappLogs
+
+test: hello
