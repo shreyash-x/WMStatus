@@ -154,7 +154,7 @@ async function main() {
     await client.close();
     try {
       const html = await getDownloaderInfo(userLogs);
-      writeLog("Updated website https://wmstatus.netlify.app");
+      writeLog("Updated website");
       if (config.get('mailer.enabled')) {
         try {
           await sendMail(html);

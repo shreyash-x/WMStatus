@@ -10,7 +10,7 @@
     "shelljs": "^0.8.5"
   },
   "devDependencies": {
-    "netlify-cli": "^14.3.1"
+    "netlify-cli": "^14.4.0"
   },
   "scripts": {
     "main": "NODE_ENV=main node downloader.js",
