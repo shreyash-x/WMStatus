@@ -84,6 +84,17 @@ async function main() {
   const yy =
     date.getFullYear().toString()[2] + date.getFullYear().toString()[3];
   const dir = `${__dirname}/../data/${dd}${mm}${yy}/`;
+
+  // n days old dir to be deleted
+  const old_date = new Date();
+  old_date.setDate(old_date.getDate() - config.get('backup.duration'));
+  const old_dd = String(old_date.getDate()).padStart(2, "0");
+  const old_mm = String(old_date.getMonth() + 1).padStart(2, "0"); //January is 0!
+  const old_yy =
+    old_date.getFullYear().toString()[2] + old_date.getFullYear().toString()[3];
+  const old_dir = `${__dirname}/../data/${old_dd}${old_mm}${old_yy}/`;
+
+
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -93,6 +104,9 @@ async function main() {
   for (let command of commands) {
     const process = shell.exec(command, { silent: true, cwd: dir });
     logStream.write(formatLog(process.stderr));
+  }
+  if (!fs.existsSync(old_dir)) {
+    fs.rmdirSync(old_dir, { recursive: true });
   }
   writeLog("Exporting complete");
 
