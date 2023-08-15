@@ -70,9 +70,6 @@ const addUserStats = (username, stats) => {
 async function main() {
   const commands = [
     "mongoexport --collection=admins --db=whatsappLogs --out=admins.json",
-    "mongoexport --collection=chatusers --db=whatsappLogs --out=chatusers.json",
-    "mongoexport --collection=contacts --db=whatsappLogs --out=contacts.json",
-    "mongoexport --collection=messages --db=whatsappLogs --out=messages.json",
     "mongoexport --collection=participants --db=whatsappLogs --out=participants.json",
     "mongoexport --collection=surveyors --db=whatsappLogs --out=surveyors.json",
   ];
@@ -117,6 +114,28 @@ async function main() {
   try {
     await client.connect();
     const bucket = new GridFSBucket(client.db(), { bucketName: "largeFiles" });
+
+    const contacts = await client
+      .db()
+      .collection("contacts")
+      .find({})
+      .toArray();
+    for (const contact of contacts) {
+      contact.contacts = await getJSONLog(bucket,contact.contacts.filename);
+    }
+    exportData(contacts, dir, "contacts.json");
+    writeLog("Exported contact logs from database");
+
+    const chatusers = await client
+      .db()
+      .collection("chatusers")
+      .find({})
+      .toArray();
+    for (const chatuser of chatusers) {
+      chatuser.chats = await getJSONLog(bucket,chatuser.chats.filename);
+    }
+    exportData(chatusers, dir, "chatusers.json");
+    writeLog("Exported chatuser logs from database");
     // await listDatabases(client);
     // get all messages from the database
     const messages = await client
@@ -138,6 +157,7 @@ async function main() {
       if (!fs.existsSync(path)) {
         fs.mkdirSync(path, { recursive: true });
       }
+      message.messages = await getJSONLog(bucket, message.messages.filename);
       for (const msg of message.messages) {
         if (msg.hasMedia && msg.mediaData) {
           const fname = msg.mediaData.filename;
@@ -160,6 +180,8 @@ async function main() {
         already_downloaded,
       });
     }
+    exportData(messages, dir, "messages.json");
+    writeLog("Exported message logs from database");
     fs.writeFileSync(`${path}/stats.json`, JSON.stringify(userLogs));
     // console.log("Connected correctly to server");
   } catch (err) {
@@ -264,3 +286,20 @@ async function downloadFile(name, path, bucket, username) {
     return -1;
   }
 }
+
+async function getJSONLog(bucket, filename) {
+
+  const fileinfo = await bucket.find({ filename: filename }).toArray();
+  if (fileinfo.length === 0) {
+    console.log("File not found", filename);
+    return;
+  }
+  const data = await extractFileFromDB(filename, bucket);
+  const json = JSON.parse(data.toString());
+  return json;
+}
+
+const exportData = async (dataArray, dir, fileName) => {
+  const jsonLData = dataArray.map(obj => JSON.stringify(obj)).join('\n');
+  fs.writeFileSync(path.resolve(dir, fileName), jsonLData, 'utf8');
+};
