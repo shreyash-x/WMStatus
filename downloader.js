@@ -2,6 +2,7 @@ const config = require('config');
 const { MongoClient, GridFSBucket } = require("mongodb");
 const mongoose = require("mongoose");
 const fs = require("fs");
+const pathLib = require("path");
 const mime = require("mime-types");
 const mongoUrl = config.get('services.mongodb.uri');
 const shell = require("shelljs");
@@ -102,7 +103,7 @@ async function main() {
     const process = shell.exec(command, { silent: true, cwd: dir });
     logStream.write(formatLog(process.stderr));
   }
-  if (!fs.existsSync(old_dir)) {
+  if (fs.existsSync(old_dir)) {
     fs.rmdirSync(old_dir, { recursive: true });
   }
   writeLog("Exporting complete");
@@ -301,5 +302,5 @@ async function getJSONLog(bucket, filename) {
 
 const exportData = async (dataArray, dir, fileName) => {
   const jsonLData = dataArray.map(obj => JSON.stringify(obj)).join('\n');
-  fs.writeFileSync(path.resolve(dir, fileName), jsonLData, 'utf8');
+  fs.writeFileSync(pathLib.resolve(dir, fileName), jsonLData, 'utf8');
 };
