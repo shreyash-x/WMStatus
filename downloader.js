@@ -164,7 +164,8 @@ async function main() {
         if (msg.hasMedia && msg.mediaData) {
           const fname = msg.mediaData.filename;
           const caption = msg.body;
-          const res = await downloadFile(fname, path, bucket, caption);
+          const msgData = msg;
+          const res = await downloadFile(fname, path, bucket, caption, msgData);
           if (res == 0) {
             already_downloaded++;
           } else if (res == 1) {
@@ -235,7 +236,7 @@ function extractFileFromDB(filename, bucket) {
   return promise;
 }
 
-async function downloadFile(name, path, bucket, caption) {
+async function downloadFile(name, path, bucket, caption, msgData) {
   try {
     const fileinfo = await bucket.find({ filename: name }).toArray();
     if (fileinfo.length === 0) {
@@ -245,6 +246,7 @@ async function downloadFile(name, path, bucket, caption) {
     const metadata = fileinfo[0].metadata;
     const fileID = fileinfo[0]._id;
     metadata['caption'] = caption;
+    metadata['message'] = msgData;
 
     // Get the file extension by mime-type
     let extension = mime.extension(metadata.contentType);
@@ -264,9 +266,9 @@ async function downloadFile(name, path, bucket, caption) {
     }
 
     const metadataFilename = path + fname + ".json";
-    if (!fs.existsSync(metadataFilename)) {
-      fs.writeFileSync(metadataFilename, JSON.stringify(metadata, null, 2));
-    }
+    // if (!fs.existsSync(metadataFilename)) {
+    fs.writeFileSync(metadataFilename, JSON.stringify(metadata, null, 2));
+    // }
 
     const fullFilename = path + fname + "." + extension;
     // check if the file is already downloaded
