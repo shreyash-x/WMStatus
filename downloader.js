@@ -5,10 +5,10 @@ const fs = require("fs");
 const pathLib = require("path");
 const mime = require("mime-types");
 const mongoUrl = config.get('services.mongodb.uri');
+const storagePath = config.get('data.path');
 const shell = require("shelljs");
 const { getDownloaderInfo } = require("./trackServer.js");
 const { sendMail } = require("./sendMail.js");
-
 
 const getPath = () => {
   const date = new Date();
@@ -59,6 +59,7 @@ const writeLog = async (log) => {
 const addUserStats = (username, stats) => {
   if (!userLogs[username]) {
     userLogs[username] = stats;
+    return;
   }
   userLogs[username] = {
     new_downloaded: userLogs[username].new_downloaded + stats.new_downloaded,
@@ -81,7 +82,7 @@ async function main() {
   const mm = String(date.getMonth() + 1).padStart(2, "0"); //January is 0!
   const yy =
     date.getFullYear().toString()[2] + date.getFullYear().toString()[3];
-  const dir = `${__dirname}/../data/${dd}${mm}${yy}/`;
+  const dir = `${storagePath}/data/${dd}${mm}${yy}/`;
 
   // n days old dir to be deleted
   const old_date = new Date();
@@ -90,7 +91,7 @@ async function main() {
   const old_mm = String(old_date.getMonth() + 1).padStart(2, "0"); //January is 0!
   const old_yy =
     old_date.getFullYear().toString()[2] + old_date.getFullYear().toString()[3];
-  const old_dir = `${__dirname}/../data/${old_dd}${old_mm}${old_yy}/`;
+  const old_dir = `${storagePath}/data/${old_dd}${old_mm}${old_yy}/`;
 
 
   if (!fs.existsSync(dir)) {
@@ -103,7 +104,7 @@ async function main() {
     const process = shell.exec(command, { silent: true, cwd: dir });
     logStream.write(formatLog(process.stderr));
   }
-  if (fs.existsSync(old_dir)) {
+  if (fs.existsSync(old_dir) && old_date.getDay() != 1) {
     fs.rmdirSync(old_dir, { recursive: true });
   }
   writeLog("Exporting complete");
@@ -154,7 +155,7 @@ async function main() {
       let already_downloaded = 0;
       // replace all the special characters with an underscore
       username = username.replace(/[^a-zA-Z0-9]/g, "_");
-      const path = `${__dirname}/../downloaded-media/${username}-${message._id}/`;
+      const path = `${storagePath}/downloaded-media/${username}-${message._id}/`;
       if (!fs.existsSync(path)) {
         fs.mkdirSync(path, { recursive: true });
       }
@@ -239,9 +240,10 @@ async function downloadFile(name, path, bucket, caption) {
     const fileinfo = await bucket.find({ filename: name }).toArray();
     if (fileinfo.length === 0) {
       writeLog(`File ${name} not found in the database`);
-      return -1;
+      return 0;
     }
     const metadata = fileinfo[0].metadata;
+    const fileID = fileinfo[0]._id;
     metadata['caption'] = caption;
 
     // Get the file extension by mime-type
@@ -269,6 +271,7 @@ async function downloadFile(name, path, bucket, caption) {
     const fullFilename = path + fname + "." + extension;
     // check if the file is already downloaded
     if (fs.existsSync(fullFilename)) {
+      await bucket.delete(fileID);
       return 0;
     }
 
@@ -281,6 +284,7 @@ async function downloadFile(name, path, bucket, caption) {
       fs.writeFileSync(fullFilename, media, {
         encoding: "base64",
       });
+      await bucket.delete(fileID);
       return 1;
       // console.log("File downloaded successfully!", fullFilename);
     } catch (err) {
@@ -296,12 +300,6 @@ async function downloadFile(name, path, bucket, caption) {
 }
 
 async function getJSONLog(bucket, filename) {
-
-  const fileinfo = await bucket.find({ filename: filename }).toArray();
-  if (fileinfo.length === 0) {
-    console.log("File not found", filename);
-    return;
-  }
   const data = await extractFileFromDB(filename, bucket);
   const json = JSON.parse(data.toString());
   return json;

@@ -6,9 +6,12 @@ services:
   frontend:
     name: wm-frontend
   backend:
-    name: backend
+    name: wm-backend
   mongodb:
     uri: mongodb://127.0.0.1:27017/whatsappLogs
+
+data:
+  path: /mnt/storage/kg766/WhatsappMonitorData
 
 backup:
   duration: 5
