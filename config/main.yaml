@@ -15,3 +15,6 @@ data:
 
 backup:
   duration: 5
+
+website:
+  enabled: true

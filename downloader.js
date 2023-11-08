@@ -36,7 +36,7 @@ const getLogStream = (path) => {
 };
 
 const getUserLogs = (path) => {
-  if(fs.existsSync(`${path}/stats.json`)) {
+  if (fs.existsSync(`${path}/stats.json`)) {
     return require(`${path}/stats.json`);
   }
   return {};
@@ -51,6 +51,10 @@ const formatLog = (log) => {
 const path = getPath();
 const logStream = getLogStream(path);
 const userLogs = getUserLogs(path);
+for (const user in userLogs) {
+  userLogs[user]["err_downloaded"] = 0;
+  userLogs[user]["already_downloaded"] = 0;
+}
 
 const writeLog = async (log) => {
   logStream.write(formatLog(log) + "\n");
@@ -123,7 +127,7 @@ async function main() {
       .find({})
       .toArray();
     for (const contact of contacts) {
-      contact.contacts = await getJSONLog(bucket,contact.contacts.filename);
+      contact.contacts = await getJSONLog(bucket, contact.contacts.filename);
     }
     exportData(contacts, dir, "contacts.json");
     writeLog("Exported contact logs from database");
@@ -134,7 +138,7 @@ async function main() {
       .find({})
       .toArray();
     for (const chatuser of chatusers) {
-      chatuser.chats = await getJSONLog(bucket,chatuser.chats.filename);
+      chatuser.chats = await getJSONLog(bucket, chatuser.chats.filename);
     }
     exportData(chatusers, dir, "chatusers.json");
     writeLog("Exported chatuser logs from database");
@@ -159,7 +163,15 @@ async function main() {
       if (!fs.existsSync(path)) {
         fs.mkdirSync(path, { recursive: true });
       }
+      const fn = message.messages.filename;
       message.messages = await getJSONLog(bucket, message.messages.filename);
+      const mlength = message.messages.length;
+      // export messages
+      const filesDir = pathLib.resolve(dir, './messageFiles');
+      if (!fs.existsSync(filesDir)) {
+        fs.mkdirSync(filesDir, { recursive: true });
+      }
+      await exportFileFromDB(fn, bucket, filesDir);
       for (const msg of message.messages) {
         if (msg.hasMedia && msg.mediaData) {
           const fname = msg.mediaData.filename;
@@ -175,6 +187,10 @@ async function main() {
           }
         }
       }
+      message.messages = {
+        filename: fn,
+        length: mlength,
+      };
       writeLog(
         `Downloaded ${new_downloaded} new files, ${already_downloaded} already downloaded files, ${err_downloaded} errors encountered while downloading files`
       );
@@ -184,8 +200,8 @@ async function main() {
         already_downloaded,
       });
     }
-    exportData(messages, dir, "messages.json");
-    writeLog("Exported message logs from database");
+     exportData(messages, dir, "messages.json");
+     writeLog("Exported message logs from database");
     fs.writeFileSync(`${path}/stats.json`, JSON.stringify(userLogs));
     // console.log("Connected correctly to server");
   } catch (err) {
@@ -194,7 +210,8 @@ async function main() {
     await client.close();
     try {
       const html = await getDownloaderInfo(userLogs);
-      writeLog("Updated website");
+      if (config.get('website.enabled'))
+        writeLog("Updated website");
       if (config.get('mailer.enabled')) {
         try {
           await sendMail(html);
@@ -311,3 +328,22 @@ const exportData = async (dataArray, dir, fileName) => {
   const jsonLData = dataArray.map(obj => JSON.stringify(obj)).join('\n');
   fs.writeFileSync(pathLib.resolve(dir, fileName), jsonLData, 'utf8');
 };
+
+
+async function exportFileFromDB(filename, bucket, dir) {
+  const downloadStream = bucket.openDownloadStreamByName(filename);
+  const folderPath = pathLib.resolve(dir, filename);
+  const outputStream = fs.createWriteStream(folderPath);
+  // extract the file from the database along with its metadata
+  const promise = new Promise((resolve, reject) => {
+    downloadStream.pipe(outputStream);
+    downloadStream.on("error", () => {
+      reject();
+    });
+
+    downloadStream.on("end", () => {
+      resolve("Done");
+    });
+  });
+  return promise;
+}

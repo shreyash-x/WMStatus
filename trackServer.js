@@ -105,7 +105,8 @@ const getDownloaderInfo = async (userStats) => {
   let yyyy = date.getFullYear();
   const fname = `${__dirname}/pages/${dd}-${mm}-${yyyy}.html`;
   fs.writeFileSync(fname, html);
-  await hostPages();
+  if (config.get('website.enabled'))
+    await hostPages();
   return html;
 };
 
